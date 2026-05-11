@@ -1,0 +1,63 @@
+name: Terraform Automation
+
+on:
+  workflow_dispatch:
+    inputs:
+
+      environment:
+        description: "Select Environment"
+        required: true
+        default: "dev"
+
+      aws_access_key:
+        description: "AWS Access Key"
+        required: true
+
+      aws_secret_key:
+        description: "AWS Secret Key"
+        required: true
+
+      backend_bucket:
+        description: "Terraform Backend S3 Bucket"
+        required: true
+
+      backend_key:
+        description: "Terraform State Key"
+        required: true
+
+      dynamodb_table:
+        description: "Terraform Lock Table"
+        required: true
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ github.event.inputs.aws_access_key }}
+          aws-secret-access-key: ${{ github.event.inputs.aws_secret_key }}
+          aws-region: us-east-1
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+          -backend-config="bucket=${{ github.event.inputs.backend_bucket }}" \
+          -backend-config="key=${{ github.event.inputs.backend_key }}" \
+          -backend-config="region=us-east-1" \
+          -backend-config="dynamodb_table=${{ github.event.inputs.dynamodb_table }}"
+
+      - name: Terraform Plan
+        run: terraform plan -var-file="${{ github.event.inputs.environment }}.tfvars"
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -var-file="${{ github.event.inputs.environment }}.tfvars"
